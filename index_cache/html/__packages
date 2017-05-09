@@ -1,0 +1,7 @@
+base
+ggplot2
+reshape2
+lattice
+caret
+randomForest
+ggthemes

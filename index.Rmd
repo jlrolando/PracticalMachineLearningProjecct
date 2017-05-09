@@ -1,0 +1,112 @@
+---
+title: "Final project: Practical Machine Learning"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+###Jose L. Rolando, May 2017
+##Summary  
+
+In the present project, a random forest algorithm was used in order to predict qualitative activity of weight lifting exercises. Data from Velloso et al. (2013) data set was used. It consisted of a set of features on the Euler angles, raw accelerometer, gyroscope and magnetometer readings extracted from sensors placed on user's gloves, armbands, lumbar belt and dumbbell. Variables with a high amount of missing values, as well as two outlier observations were removed. The fitted model had a accuracy of 99.46%. Based on this results, we conclude that fitting a random forest to the sensors raw data is enough in order to predict the quality of a weight lifting exercise.
+
+##Getting and cleaning data
+
+Load libraries, and download the training and test dataset. 
+
+```{r}
+#libraries
+library(ggplot2)
+library(reshape2)
+library(caret)
+library(randomForest)
+library(ggthemes)
+```
+```{r}
+#DOWNLOAD FILES
+destfile1 <- './pml-training.csv'
+if (!file.exists(destfile1))
+      {
+      download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "./pml-training.csv")
+}
+
+destfile2 <- "./pml-testing.csv"
+if (!file.exists(destfile2))
+      {
+      download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "./pml-testing.csv")
+}
+```
+
+Load the downloaded data frames into R. 
+
+```{r}
+#Import data to R
+pml<-read.csv("pml-training.csv", header = T, na.strings = c("NA", ""))
+test<-read.csv("pml-testing.csv", header = T, na.strings = c("NA", ""))
+```
+
+Summary statistics are presented. 
+```{r}
+summary(pml$classe)
+summary(pml[,1:15])
+```
+
+Since some variables present a great percentage of missing values, we quantified how many observations were missing. 
+```{r}
+count.NA <- apply(pml, 2, function(x) sum(is.na(x)))
+unique(count.NA)
+19216/length(pml$avg_pitch_forearm)
+```
+
+The variables with almost 98% of missing values were removed from the dataset.
+```{r}
+query.NA <- apply(as.matrix(count.NA), 2, function(x) x == 19216)
+pml<- pml[,!query.NA]
+test<- test[,!query.NA]
+```
+
+The first 7 variables were also removed, since they were related to identifying the observation in user subject, ID, or time variables that are not relevant in order to predict future events in random people and events.
+```{r}
+names(pml)[1:7]
+pml<-pml[,8:60]
+test<-test[,8:60]
+```
+Two outlier observations were removed based on a exploratory analysis not shown in the present report.
+```{r}
+pml<-pml[pml$gyros_forearm_y<200 & pml$magnet_dumbbell_y > -3000,]
+```
+
+##Exploratory analysis
+Having run some cleaning code to the data set, we now present a boxplot of all remaining variables in order confirm the effectiveness of the process.
+
+```{r, fig.height=15, fig.width=10}
+plot_train<-melt(pml, id = "classe")
+fill <- "#4271AE"
+line <- "#1F3552"
+ggplot(plot_train, (aes(x=classe, y=value)))+geom_boxplot(fill = fill, colour = line)+
+      facet_wrap(~variable, scales="free_y", ncol=6)+theme_minimal()+
+      theme(legend.position = "none")
+```
+
+##Machine learning algorithm
+
+The test data set was not used in order to verify the fitted model because the "classe" outcome was not present. Instead, we subsetted the largest data set in two (i.e., training and testing) in order to validate our fitted model correctly, and avoid overfitting.
+
+```{r}
+set.seed(325)
+
+inTrain<-createDataPartition(pml$classe,p=0.7, list=FALSE)
+training<-pml[inTrain,]
+testing<-pml[-inTrain,]
+```
+
+Next, we trained out training data set using the random forest algorithm. We show the confusion matrix of the prediction and actual values from the testing data set.
+```{r, cache=TRUE}
+mod1<-randomForest(classe ~ ., data = training, prox= TRUE)
+pred1<-predict(mod1, newdata = testing)
+confusionMatrix(pred1,testing$classe)
+```
+The fitted model had a accuracy of 99.46%. Based on this results, we conclude that fitting a random forest to the sensors raw data is enough in order to predict the quality of a weight lifting exercise.
